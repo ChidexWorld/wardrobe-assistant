@@ -28,7 +28,7 @@ const OutfitList: React.FC = () => {
   const fetchOutfits = async () => {
     try {
       setLoading(true);
-      const response = await apiService.getOutfits(20, 0);
+      const response = await apiService.getOutfits(20, 0) as { outfits?: Outfit[] };
       setOutfits(response.outfits || []);
     } catch (error) {
       console.error('Failed to fetch outfits:', error);

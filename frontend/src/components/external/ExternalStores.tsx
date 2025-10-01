@@ -19,12 +19,6 @@ interface ExternalItem {
   total_cost: number;
 }
 
-interface SearchResponse {
-  query: any;
-  results: ExternalItem[];
-  total_found: number;
-}
-
 const ExternalStores: React.FC = () => {
   const apiService = ApiService.getInstance();
   const [searchResults, setSearchResults] = useState<ExternalItem[]>([]);
@@ -50,7 +44,7 @@ const ExternalStores: React.FC = () => {
 
     setLoading(true);
     try {
-      const data = await apiService.searchExternalStores(searchQuery, category, 20);
+      const data = await apiService.searchExternalStores(searchQuery, category, 20) as { results?: ExternalItem[] };
       setSearchResults(data.results || []);
     } catch (error) {
       console.error('Error searching external stores:', error);

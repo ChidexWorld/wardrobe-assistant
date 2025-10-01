@@ -34,8 +34,8 @@ const OutfitBuilder: React.FC = () => {
   const [currentOutfit, setCurrentOutfit] = useState<{ [key: string]: ClothingItem }>({});
   const [outfitName, setOutfitName] = useState('');
 
-  const mapClothingTypeToCategory = (type: string): string => {
-    const typeMap: { [key: string]: string } = {
+  const mapClothingTypeToCategory = (type: string): 'top' | 'bottom' | 'shoes' | 'accessories' | 'outerwear' => {
+    const typeMap: { [key: string]: 'top' | 'bottom' | 'shoes' | 'accessories' | 'outerwear' } = {
       'shirt': 'top',
       'pants': 'bottom',
       'dress': 'top',
@@ -56,7 +56,7 @@ const OutfitBuilder: React.FC = () => {
   const fetchWardrobeItems = async () => {
     try {
       setLoading(true);
-      const response = await apiService.getWardrobeItems();
+      const response = await apiService.getWardrobeItems() as { items?: any[] };
       const items = (response.items || []).map((item: any) => ({
         id: item.id,
         name: item.name,

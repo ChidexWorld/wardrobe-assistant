@@ -51,7 +51,7 @@ const PriceComparison: React.FC = () => {
 
     setLoading(true);
     try {
-      const data = await apiService.comparePrices(itemName, category);
+      const data = await apiService.comparePrices(itemName, category) as ComparisonResponse;
       setComparisonData(data);
     } catch (error) {
       console.error('Failed to compare prices:', error);

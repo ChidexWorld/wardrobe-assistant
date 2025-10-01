@@ -27,7 +27,7 @@ const WardrobeItemDetail: React.FC<WardrobeItemDetailProps> = ({ itemId, onClose
   const fetchItemDetails = async () => {
     try {
       setLoading(true);
-      const data = await apiService.getClothingItem(itemId);
+      const data = await apiService.getClothingItem(itemId) as any;
       setItem(data);
       setFormData({
         name: data.name || '',

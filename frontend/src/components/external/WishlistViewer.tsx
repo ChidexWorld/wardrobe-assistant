@@ -27,7 +27,7 @@ const WishlistViewer: React.FC = () => {
   const fetchWishlist = async () => {
     try {
       setLoading(true);
-      const response = await apiService.getWishlist('user123');
+      const response = await apiService.getWishlist('user123') as { wishlist?: WishlistItem[], total_value?: number };
       setWishlist(response.wishlist || []);
       setTotalValue(response.total_value || 0);
     } catch (error) {

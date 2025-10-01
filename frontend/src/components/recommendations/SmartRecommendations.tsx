@@ -14,15 +14,6 @@ interface Recommendation {
   style_score: number;
 }
 
-interface RecommendationsResponse {
-  recommendations: Recommendation[];
-  criteria: {
-    event?: string;
-    weather?: any;
-    user_preferences: string;
-  };
-}
-
 const SmartRecommendations: React.FC = () => {
   const apiService = ApiService.getInstance();
   const { user } = useAuth();
@@ -61,7 +52,7 @@ const SmartRecommendations: React.FC = () => {
 
     setLoading(true);
     try {
-      const data = await apiService.getOutfitRecommendations(userId, event || undefined, weatherTemp);
+      const data = await apiService.getOutfitRecommendations(userId, event || undefined, weatherTemp) as { recommendations?: Recommendation[] };
       setRecommendations(data.recommendations || []);
     } catch (error) {
       console.error('Error fetching recommendations:', error);

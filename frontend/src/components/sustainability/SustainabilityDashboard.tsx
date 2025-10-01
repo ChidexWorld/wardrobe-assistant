@@ -47,7 +47,7 @@ const SustainabilityDashboard: React.FC = () => {
 
     setLoading(true);
     try {
-      const result = await apiService.getSustainabilityInsights(userId);
+      const result = await apiService.getSustainabilityInsights(userId) as SustainabilityResponse;
       setData(result);
     } catch (error) {
       console.error('Error fetching sustainability data:', error);

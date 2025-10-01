@@ -14,7 +14,6 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState<TabType>('wardrobe');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [wardrobeItems, setWardrobeItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const apiService = ApiService.getInstance();
 
@@ -31,14 +30,11 @@ const Dashboard = () => {
   }, [activeTab]);
 
   const fetchWardrobeItems = async () => {
-    setLoading(true);
     try {
       const response: any = await apiService.getWardrobeItems();
       setWardrobeItems(response.items || []);
     } catch (error) {
       console.error('Failed to fetch wardrobe items:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
