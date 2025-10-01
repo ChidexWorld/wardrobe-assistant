@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ApiService } from '../../services/api';
+import { API_BASE_URL } from '../../config';
 
 interface WardrobeItemDetailProps {
   itemId: string;
@@ -110,7 +111,7 @@ const WardrobeItemDetail: React.FC<WardrobeItemDetailProps> = ({ itemId, onClose
             <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
               {item.imageUrl ? (
                 <img
-                  src={`http://localhost:8000${item.imageUrl}`}
+                  src={`${API_BASE_URL}${item.imageUrl}`}
                   alt={item.name}
                   className="w-full h-full object-cover"
                 />

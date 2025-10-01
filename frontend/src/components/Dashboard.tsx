@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ApiService } from '../services/api';
+import { API_BASE_URL } from '../config';
 import WardrobeUpload from './wardrobe/WardrobeUpload';
 import OutfitBuilder from './outfits/OutfitBuilder';
 import SmartRecommendations from './recommendations/SmartRecommendations';
@@ -228,7 +229,7 @@ const WardrobeContent = ({ items, onDelete, onMarkAsWorn }: WardrobeContentProps
             <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
               {item.imageUrl ? (
                 <img
-                  src={`http://localhost:8000${item.imageUrl}`}
+                  src={`${API_BASE_URL}${item.imageUrl}`}
                   alt={item.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                 />

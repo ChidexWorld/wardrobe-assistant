@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useDrop, useDrag, DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { ApiService } from '../../services/api';
+import { API_BASE_URL } from '../../config';
 
 interface ClothingItem {
   id: string;
@@ -62,7 +63,7 @@ const OutfitBuilder: React.FC = () => {
         name: item.name,
         type: item.type || item.clothing_type,
         color: item.color,
-        imageUrl: item.imageUrl ? `http://localhost:8000${item.imageUrl}` : '/api/placeholder/150/150',
+        imageUrl: item.imageUrl ? `${API_BASE_URL}${item.imageUrl}` : '/api/placeholder/150/150',
         category: mapClothingTypeToCategory(item.type || item.clothing_type)
       }));
       setWardrobeItems(items);

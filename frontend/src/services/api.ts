@@ -1,6 +1,5 @@
 import { authService } from './auth';
-
-const API_BASE_URL = 'http://localhost:8000';
+import { API_BASE_URL } from '../config';
 
 export class ApiService {
   private static instance: ApiService;
