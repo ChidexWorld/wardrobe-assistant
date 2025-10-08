@@ -57,7 +57,13 @@ const WardrobeUpload = ({ onUpload, onClose }: WardrobeUploadProps) => {
     try {
       const uploadFormData = new FormData();
       Object.entries(formData).forEach(([key, value]) => {
-        uploadFormData.append(key, value);
+        if (key === 'tags') {
+          // Convert comma-separated tags to JSON array string
+          const tagsArray = value ? value.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag) : [];
+          uploadFormData.append(key, JSON.stringify(tagsArray));
+        } else {
+          uploadFormData.append(key, value);
+        }
       });
       uploadFormData.append('file', selectedFile);
 

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ApiService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { locationService } from '../../services/location';
+import type { LocationData, WeatherData } from '../../services/location';
 import ExternalStores from '../external/ExternalStores';
 
 interface Recommendation {
@@ -19,9 +21,13 @@ const SmartRecommendations: React.FC = () => {
   const { user } = useAuth();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingLocation, setLoadingLocation] = useState(true);
   const [event, setEvent] = useState('');
-  const [weatherTemp, setWeatherTemp] = useState<number>(20);
-  const [weatherCondition, setWeatherCondition] = useState('sunny');
+  const [location, setLocation] = useState<LocationData | null>(null);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [showLocationInput, setShowLocationInput] = useState(false);
+  const [manualLocation, setManualLocation] = useState('');
 
   const eventOptions = [
     { value: '', label: 'Any Event' },
@@ -34,13 +40,95 @@ const SmartRecommendations: React.FC = () => {
     { value: 'workout', label: 'Workout' }
   ];
 
-  const weatherOptions = [
-    { value: 'sunny', label: 'Sunny' },
-    { value: 'cloudy', label: 'Cloudy' },
-    { value: 'rainy', label: 'Rainy' },
-    { value: 'snowy', label: 'Snowy' },
-    { value: 'windy', label: 'Windy' }
-  ];
+  // Automatically detect location and fetch weather on component mount
+  const detectLocationAndWeather = async () => {
+    setLoadingLocation(true);
+    setLocationError(null);
+
+    // Check if user has saved a manual location
+    const savedLocation = localStorage.getItem('userLocation');
+    if (savedLocation) {
+      try {
+        await fetchWeatherForCity(savedLocation);
+        return;
+      } catch (error) {
+        console.error('Error fetching weather for saved location:', error);
+      }
+    }
+
+    try {
+      const { location: detectedLocation, weather: detectedWeather } =
+        await locationService.getLocationAndWeather();
+
+      setLocation(detectedLocation);
+      setWeather(detectedWeather);
+    } catch (error) {
+      console.error('Error detecting location:', error);
+      setLocationError(error instanceof Error ? error.message : 'Failed to detect location');
+
+      // Set default values if location detection fails
+      setWeather({
+        temperature: 20,
+        condition: 'sunny',
+        description: 'Clear',
+        humidity: 50,
+        windSpeed: 10,
+      });
+    } finally {
+      setLoadingLocation(false);
+    }
+  };
+
+  // Fetch weather for a manually entered city
+  const fetchWeatherForCity = async (cityName: string) => {
+    setLoadingLocation(true);
+    setLocationError(null);
+
+    try {
+      const weatherData = await locationService.getWeather(cityName);
+      setWeather(weatherData);
+
+      // Parse city and country from the input
+      const parts = cityName.split(',').map(p => p.trim());
+      setLocation({
+        city: parts[0] || cityName,
+        country: parts[1] || '',
+        latitude: 0,
+        longitude: 0,
+      });
+
+      // Save to localStorage
+      localStorage.setItem('userLocation', cityName);
+      setShowLocationInput(false);
+    } catch (error) {
+      console.error('Error fetching weather for city:', error);
+      setLocationError('Could not fetch weather for this location');
+    } finally {
+      setLoadingLocation(false);
+    }
+  };
+
+  // Handle manual location submission
+  const handleSetManualLocation = () => {
+    if (manualLocation.trim()) {
+      fetchWeatherForCity(manualLocation.trim());
+    }
+  };
+
+  // Refresh weather data
+  const refreshWeather = async () => {
+    if (!location) return;
+
+    setLoadingLocation(true);
+    try {
+      const updatedWeather = await locationService.getWeather(location);
+      setWeather(updatedWeather);
+    } catch (error) {
+      console.error('Error refreshing weather:', error);
+    } finally {
+      setLoadingLocation(false);
+    }
+  };
 
   const fetchRecommendations = async () => {
     // Temporary fallback for debugging - use a test user ID if real one is missing
@@ -52,7 +140,12 @@ const SmartRecommendations: React.FC = () => {
 
     setLoading(true);
     try {
-      const data = await apiService.getOutfitRecommendations(userId, event || undefined, weatherTemp) as { recommendations?: Recommendation[] };
+      const temperature = weather?.temperature ?? 20;
+      const data = await apiService.getOutfitRecommendations(
+        userId,
+        event || undefined,
+        temperature
+      ) as { recommendations?: Recommendation[] };
       setRecommendations(data.recommendations || []);
     } catch (error) {
       console.error('Error fetching recommendations:', error);
@@ -62,9 +155,17 @@ const SmartRecommendations: React.FC = () => {
     }
   };
 
+  // Detect location and weather on component mount
   useEffect(() => {
-    fetchRecommendations();
+    detectLocationAndWeather();
   }, []);
+
+  // Fetch recommendations when weather data is available
+  useEffect(() => {
+    if (weather) {
+      fetchRecommendations();
+    }
+  }, [weather]);
 
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 0.8) return 'text-green-600';
@@ -83,10 +184,105 @@ const SmartRecommendations: React.FC = () => {
       <div className="bg-white rounded-lg p-6 shadow-sm">
         <h2 className="text-2xl font-bold mb-6">Smart Outfit Recommendations</h2>
 
+        {/* Weather Information Display */}
+        {loadingLocation ? (
+          <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-2"></div>
+              <span className="text-blue-700">Detecting your location and weather...</span>
+            </div>
+          </div>
+        ) : locationError ? (
+          <div className="mb-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="text-yellow-800 text-sm font-medium">Location Detection Failed</p>
+                <p className="text-yellow-700 text-xs mt-1">{locationError}</p>
+                <p className="text-yellow-600 text-xs mt-1">Using default weather settings</p>
+              </div>
+              <button
+                onClick={detectLocationAndWeather}
+                className="ml-2 px-3 py-1 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        ) : weather && (
+          <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                {showLocationInput ? (
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      value={manualLocation}
+                      onChange={(e) => setManualLocation(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleSetManualLocation()}
+                      placeholder="Enter city (e.g., Awka, Nigeria)"
+                      className="flex-1 px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      onClick={handleSetManualLocation}
+                      disabled={loadingLocation || !manualLocation.trim()}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      Set
+                    </button>
+                    <button
+                      onClick={() => setShowLocationInput(false)}
+                      className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center space-x-2 mb-2">
+                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span className="font-semibold text-blue-900">
+                        {location?.city}{location?.country && `, ${location.country}`}
+                      </span>
+                      <button
+                        onClick={() => {
+                          setShowLocationInput(true);
+                          setManualLocation(location?.city || '');
+                        }}
+                        className="text-blue-600 hover:text-blue-800 text-xs underline"
+                      >
+                        Change
+                      </button>
+                    </div>
+                    <div className="flex items-center space-x-4 text-sm">
+                      <span className="text-blue-700">
+                        <span className="font-medium">{weather.temperature}°C</span> - {weather.description}
+                      </span>
+                      <span className="text-blue-600">💧 {weather.humidity}%</span>
+                      <span className="text-blue-600">💨 {weather.windSpeed} km/h</span>
+                    </div>
+                  </>
+                )}
+              </div>
+              {!showLocationInput && (
+                <button
+                  onClick={refreshWeather}
+                  disabled={loadingLocation}
+                  className="ml-2 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Refresh
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Event</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Event Type</label>
             <select
               value={event}
               onChange={(e) => setEvent(e.target.value)}
@@ -100,37 +296,10 @@ const SmartRecommendations: React.FC = () => {
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Temperature (°C)</label>
-            <input
-              type="number"
-              value={weatherTemp}
-              onChange={(e) => setWeatherTemp(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              min="-20"
-              max="50"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Weather</label>
-            <select
-              value={weatherCondition}
-              onChange={(e) => setWeatherCondition(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {weatherOptions.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-end sm:col-span-2 md:col-span-1">
+          <div className="flex items-end">
             <button
               onClick={fetchRecommendations}
-              disabled={loading}
+              disabled={loading || loadingLocation}
               className="w-full px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
             >
               {loading ? 'Generating...' : 'Get Recommendations'}
