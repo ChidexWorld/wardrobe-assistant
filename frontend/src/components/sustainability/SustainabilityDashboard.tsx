@@ -32,12 +32,13 @@ const SustainabilityDashboard: React.FC = () => {
   const { user } = useAuth();
   const [data, setData] = useState<SustainabilityResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     fetchSustainabilityData();
   }, []);
 
-  const fetchSustainabilityData = async () => {
+  const fetchSustainabilityData = async (showRefreshIndicator = false) => {
     // Temporary fallback for debugging
     const userId = user?.id || 'test-user-123';
 
@@ -45,7 +46,12 @@ const SustainabilityDashboard: React.FC = () => {
       console.error('User ID is not available for sustainability, using fallback:', user);
     }
 
-    setLoading(true);
+    if (showRefreshIndicator) {
+      setIsRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
     try {
       const result = await apiService.getSustainabilityInsights(userId) as SustainabilityResponse;
       setData(result);
@@ -54,7 +60,12 @@ const SustainabilityDashboard: React.FC = () => {
       setData(null);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    await fetchSustainabilityData(true);
   };
 
   const getScoreColor = (score: number) => {
@@ -107,10 +118,27 @@ const SustainabilityDashboard: React.FC = () => {
       <div className="bg-white rounded-lg p-6 shadow-sm">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold">Sustainability Score</h2>
-          <div className={`px-4 py-2 rounded-full ${getScoreBgColor(data.sustainability_score)}`}>
-            <span className={`text-lg font-bold ${getScoreColor(data.sustainability_score)}`}>
-              {data.sustainability_score}/100
-            </span>
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing || loading}
+              className="text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              title="Refresh sustainability data"
+            >
+              <svg
+                className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            <div className={`px-4 py-2 rounded-full ${getScoreBgColor(data.sustainability_score)}`}>
+              <span className={`text-lg font-bold ${getScoreColor(data.sustainability_score)}`}>
+                {data.sustainability_score}/100
+              </span>
+            </div>
           </div>
         </div>
 

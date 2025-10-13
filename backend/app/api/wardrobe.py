@@ -132,47 +132,102 @@ async def get_clothing_item(
 ):
     """Get a specific clothing item by ID"""
 
-    # Mock data for now
-    item = {
-        "id": item_id,
-        "name": "Blue Denim Jeans",
-        "type": "pants",
-        "color": "blue",
-        "size": "M",
-        "brand": "Levi's",
-        "price": 79.99,
-        "imageUrl": "/static/uploads/placeholder.jpg",
-        "tags": ["casual", "denim", "everyday"],
-        "usageCount": 5,
-        "lastWorn": "2024-01-15",
-        "createdAt": "2024-01-01"
+    item = db.query(ClothingItem).filter(
+        ClothingItem.id == item_id,
+        ClothingItem.user_id == current_user_id
+    ).first()
+
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    return {
+        "id": item.id,
+        "name": item.name,
+        "type": item.clothing_type,
+        "color": item.color,
+        "size": item.size,
+        "brand": item.brand,
+        "price": item.price,
+        "imageUrl": item.image_url,
+        "tags": json.loads(item.tags) if item.tags else [],
+        "usageCount": item.usage_count,
+        "lastWorn": item.last_worn.isoformat() if item.last_worn else None,
+        "createdAt": item.created_at.isoformat() if item.created_at else None
     }
 
-    return item
-
 @router.put("/items/{item_id}")
-async def update_clothing_item(item_id: str, updates: dict):
+async def update_clothing_item(
+    item_id: str,
+    updates: dict,
+    current_user_id: str = Depends(get_current_user_id),
+    db = Depends(get_db)
+):
     """Update a clothing item"""
 
-    # In a real implementation, update database here
-    # item = db.query(ClothingItem).filter(ClothingItem.id == item_id).first()
-    # if not item:
-    #     raise HTTPException(status_code=404, detail="Item not found")
+    item = db.query(ClothingItem).filter(
+        ClothingItem.id == item_id,
+        ClothingItem.user_id == current_user_id
+    ).first()
+
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    # Update allowed fields
+    allowed_fields = ['name', 'clothing_type', 'color', 'size', 'brand', 'price', 'tags']
+    for field, value in updates.items():
+        if field in allowed_fields and hasattr(item, field):
+            if field == 'tags' and isinstance(value, list):
+                setattr(item, field, json.dumps(value))
+            else:
+                setattr(item, field, value)
+
+    db.commit()
+    db.refresh(item)
 
     return {
         "message": "Item updated successfully",
         "item_id": item_id,
-        "updates": updates
+        "item": {
+            "id": item.id,
+            "name": item.name,
+            "type": item.clothing_type,
+            "color": item.color,
+            "size": item.size,
+            "brand": item.brand,
+            "price": item.price,
+            "imageUrl": item.image_url,
+            "tags": json.loads(item.tags) if item.tags else []
+        }
     }
 
 @router.delete("/items/{item_id}")
-async def delete_clothing_item(item_id: str):
+async def delete_clothing_item(
+    item_id: str,
+    current_user_id: str = Depends(get_current_user_id),
+    db = Depends(get_db)
+):
     """Delete a clothing item"""
 
-    # In a real implementation, delete from database and remove file
-    # item = db.query(ClothingItem).filter(ClothingItem.id == item_id).first()
-    # if not item:
-    #     raise HTTPException(status_code=404, detail="Item not found")
+    item = db.query(ClothingItem).filter(
+        ClothingItem.id == item_id,
+        ClothingItem.user_id == current_user_id
+    ).first()
+
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    # Delete the image file if it exists
+    if item.image_url:
+        try:
+            file_path = Path(f".{item.image_url}")
+            if file_path.exists():
+                file_path.unlink()
+        except Exception as e:
+            print(f"Error deleting file: {e}")
+
+    # Delete from database
+    db.delete(item)
+    db.commit()
 
     return {
         "message": "Item deleted successfully",
@@ -180,13 +235,32 @@ async def delete_clothing_item(item_id: str):
     }
 
 @router.post("/items/{item_id}/worn")
-async def mark_item_worn(item_id: str):
+async def mark_item_worn(
+    item_id: str,
+    current_user_id: str = Depends(get_current_user_id),
+    db = Depends(get_db)
+):
     """Mark an item as worn (increment usage count)"""
 
-    # In a real implementation, update usage count and last_worn date
+    item = db.query(ClothingItem).filter(
+        ClothingItem.id == item_id,
+        ClothingItem.user_id == current_user_id
+    ).first()
+
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    # Increment usage count and update last_worn
+    from datetime import datetime
+    item.usage_count = (item.usage_count or 0) + 1
+    item.last_worn = datetime.utcnow()
+
+    db.commit()
+    db.refresh(item)
 
     return {
         "message": "Item marked as worn",
         "item_id": item_id,
-        "new_usage_count": 6  # Mock increment
+        "new_usage_count": item.usage_count,
+        "last_worn": item.last_worn.isoformat()
     }

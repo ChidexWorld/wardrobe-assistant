@@ -16,6 +16,7 @@ const Dashboard = () => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [wardrobeItems, setWardrobeItems] = useState<any[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const apiService = ApiService.getInstance();
 
   // Debug user object
@@ -32,11 +33,18 @@ const Dashboard = () => {
 
   const fetchWardrobeItems = async () => {
     try {
+      setIsRefreshing(true);
       const response: any = await apiService.getWardrobeItems();
       setWardrobeItems(response.items || []);
     } catch (error) {
       console.error('Failed to fetch wardrobe items:', error);
+    } finally {
+      setIsRefreshing(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    await fetchWardrobeItems();
   };
 
   const handleUpload = (newItem: any) => {
@@ -165,13 +173,30 @@ const Dashboard = () => {
 
             <div className="flex items-center space-x-2 sm:space-x-4">
               {activeTab === 'wardrobe' && (
-                <button
-                  onClick={() => setShowUploadModal(true)}
-                  className="bg-primary-600 text-white px-3 sm:px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors text-xs sm:text-sm whitespace-nowrap"
-                >
-                  <span className="hidden sm:inline">+ Add Item</span>
-                  <span className="sm:hidden">+</span>
-                </button>
+                <>
+                  <button
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    className="text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    title="Refresh wardrobe"
+                  >
+                    <svg
+                      className={`w-5 h-5 sm:w-6 sm:h-6 ${isRefreshing ? 'animate-spin' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setShowUploadModal(true)}
+                    className="bg-primary-600 text-white px-3 sm:px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors text-xs sm:text-sm whitespace-nowrap"
+                  >
+                    <span className="hidden sm:inline">+ Add Item</span>
+                    <span className="sm:hidden">+</span>
+                  </button>
+                </>
               )}
               <div className="w-8 h-8 bg-gray-300 rounded-full flex-shrink-0"></div>
             </div>
@@ -207,8 +232,16 @@ const Dashboard = () => {
   );
 };
 
+interface WardrobeItem {
+  id: string;
+  name: string;
+  type: string;
+  imageUrl?: string;
+  usageCount?: number;
+}
+
 interface WardrobeContentProps {
-  items: any[];
+  items: WardrobeItem[];
   onDelete: (itemId: string) => void;
   onMarkAsWorn: (itemId: string) => void;
 }

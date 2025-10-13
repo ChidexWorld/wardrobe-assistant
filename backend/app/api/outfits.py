@@ -30,26 +30,42 @@ async def create_outfit(
     db = Depends(get_db)
 ):
     """Create a new outfit"""
+    import json
+    from ..models.clothing import Outfit
 
     outfit_id = str(uuid.uuid4())
 
-    # In a real implementation, save to database
-    outfit_data = {
-        "id": outfit_id,
-        "user_id": current_user_id,
-        "name": outfit.name,
-        "items": outfit.items,
-        "event": outfit.event,
-        "weather": outfit.weather,
-        "rating": None,
-        "created_at": datetime.now().isoformat(),
-        "last_worn": None,
-        "wear_count": 0
-    }
+    # Create outfit in database
+    new_outfit = Outfit(
+        id=outfit_id,
+        user_id=current_user_id,
+        name=outfit.name,
+        items=json.dumps(outfit.items),
+        event=outfit.event,
+        weather=json.dumps(outfit.weather) if outfit.weather else None,
+        rating=None,
+        created_at=datetime.now(),
+        last_worn=None
+    )
+
+    db.add(new_outfit)
+    db.commit()
+    db.refresh(new_outfit)
 
     return {
         "message": "Outfit created successfully",
-        "outfit": outfit_data
+        "outfit": {
+            "id": new_outfit.id,
+            "user_id": new_outfit.user_id,
+            "name": new_outfit.name,
+            "items": json.loads(new_outfit.items),
+            "event": new_outfit.event,
+            "weather": json.loads(new_outfit.weather) if new_outfit.weather else None,
+            "rating": new_outfit.rating,
+            "created_at": new_outfit.created_at.isoformat(),
+            "last_worn": None,
+            "wear_count": 0
+        }
     }
 
 @router.get("/")
@@ -60,41 +76,33 @@ async def get_user_outfits(
     db = Depends(get_db)
 ):
     """Get all outfits for a user"""
+    import json
+    from ..models.clothing import Outfit
 
-    # Mock data for now
-    mock_outfits = [
-        {
-            "id": "outfit_1",
-            "user_id": user_id,
-            "name": "Casual Friday",
-            "items": ["item1", "item2", "item3"],
-            "event": "work",
-            "weather": {"temp": 22, "condition": "sunny"},
-            "rating": 4,
-            "created_at": "2024-01-15T10:00:00",
-            "last_worn": "2024-01-20T08:30:00",
-            "wear_count": 3
-        },
-        {
-            "id": "outfit_2",
-            "user_id": user_id,
-            "name": "Weekend Brunch",
-            "items": ["item4", "item5", "item6"],
-            "event": "casual",
-            "weather": {"temp": 18, "condition": "cloudy"},
-            "rating": 5,
-            "created_at": "2024-01-10T14:00:00",
-            "last_worn": "2024-01-21T11:00:00",
-            "wear_count": 2
-        }
-    ]
+    # Query outfits for the current user
+    query = db.query(Outfit).filter(Outfit.user_id == current_user_id)
+    total = query.count()
 
-    # Apply pagination
-    total = len(mock_outfits)
-    paginated_outfits = mock_outfits[offset:offset + limit]
+    outfits = query.order_by(Outfit.created_at.desc()).limit(limit).offset(offset).all()
+
+    # Convert to response format
+    outfit_list = []
+    for outfit in outfits:
+        outfit_list.append({
+            "id": outfit.id,
+            "user_id": outfit.user_id,
+            "name": outfit.name,
+            "items": json.loads(outfit.items) if outfit.items else [],
+            "event": outfit.event,
+            "weather": json.loads(outfit.weather) if outfit.weather else None,
+            "rating": outfit.rating,
+            "created_at": outfit.created_at.isoformat() if outfit.created_at else None,
+            "last_worn": outfit.last_worn.isoformat() if outfit.last_worn else None,
+            "wear_count": 0  # We'll need to add this field to the model later
+        })
 
     return {
-        "outfits": paginated_outfits,
+        "outfits": outfit_list,
         "total": total,
         "limit": limit,
         "offset": offset
@@ -121,52 +129,134 @@ async def get_outfit(outfit_id: str):
     return outfit
 
 @router.put("/{outfit_id}")
-async def update_outfit(outfit_id: str, updates: OutfitUpdate):
+async def update_outfit(
+    outfit_id: str,
+    updates: OutfitUpdate,
+    current_user_id: str = Depends(get_current_user_id),
+    db = Depends(get_db)
+):
     """Update an existing outfit"""
+    import json
+    from ..models.clothing import Outfit
 
-    # In a real implementation, update database
-    updated_outfit = {
-        "id": outfit_id,
+    outfit = db.query(Outfit).filter(
+        Outfit.id == outfit_id,
+        Outfit.user_id == current_user_id
+    ).first()
+
+    if not outfit:
+        raise HTTPException(status_code=404, detail="Outfit not found")
+
+    # Update fields
+    update_data = updates.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        if field == "items" and value is not None:
+            setattr(outfit, field, json.dumps(value))
+        elif field == "weather" and value is not None:
+            setattr(outfit, field, json.dumps(value))
+        elif value is not None:
+            setattr(outfit, field, value)
+
+    db.commit()
+    db.refresh(outfit)
+
+    return {
+        "id": outfit.id,
         "message": "Outfit updated successfully",
-        "updates": updates.dict(exclude_unset=True)
+        "outfit": {
+            "id": outfit.id,
+            "name": outfit.name,
+            "items": json.loads(outfit.items) if outfit.items else [],
+            "event": outfit.event,
+            "weather": json.loads(outfit.weather) if outfit.weather else None,
+            "rating": outfit.rating
+        }
     }
 
-    return updated_outfit
-
 @router.delete("/{outfit_id}")
-async def delete_outfit(outfit_id: str):
+async def delete_outfit(
+    outfit_id: str,
+    current_user_id: str = Depends(get_current_user_id),
+    db = Depends(get_db)
+):
     """Delete an outfit"""
+    from ..models.clothing import Outfit
 
-    # In a real implementation, delete from database
+    outfit = db.query(Outfit).filter(
+        Outfit.id == outfit_id,
+        Outfit.user_id == current_user_id
+    ).first()
+
+    if not outfit:
+        raise HTTPException(status_code=404, detail="Outfit not found")
+
+    db.delete(outfit)
+    db.commit()
+
     return {
         "message": "Outfit deleted successfully",
         "outfit_id": outfit_id
     }
 
 @router.post("/{outfit_id}/wear")
-async def record_outfit_wear(outfit_id: str):
+async def record_outfit_wear(
+    outfit_id: str,
+    current_user_id: str = Depends(get_current_user_id),
+    db = Depends(get_db)
+):
     """Record that an outfit was worn (increment wear count, update last_worn)"""
+    from ..models.clothing import Outfit
 
-    # In a real implementation, update database
+    outfit = db.query(Outfit).filter(
+        Outfit.id == outfit_id,
+        Outfit.user_id == current_user_id
+    ).first()
+
+    if not outfit:
+        raise HTTPException(status_code=404, detail="Outfit not found")
+
+    # Update last_worn timestamp
+    outfit.last_worn = datetime.now()
+
+    db.commit()
+    db.refresh(outfit)
+
     return {
         "message": "Outfit wear recorded",
         "outfit_id": outfit_id,
-        "new_wear_count": 4,
-        "last_worn": datetime.now().isoformat()
+        "last_worn": outfit.last_worn.isoformat()
     }
 
 @router.post("/{outfit_id}/rate")
-async def rate_outfit(outfit_id: str, rating: int):
+async def rate_outfit(
+    outfit_id: str,
+    rating: int,
+    current_user_id: str = Depends(get_current_user_id),
+    db = Depends(get_db)
+):
     """Rate an outfit (1-5 stars)"""
+    from ..models.clothing import Outfit
 
     if not 1 <= rating <= 5:
         raise HTTPException(status_code=400, detail="Rating must be between 1 and 5")
 
-    # In a real implementation, update database
+    outfit = db.query(Outfit).filter(
+        Outfit.id == outfit_id,
+        Outfit.user_id == current_user_id
+    ).first()
+
+    if not outfit:
+        raise HTTPException(status_code=404, detail="Outfit not found")
+
+    outfit.rating = rating
+
+    db.commit()
+    db.refresh(outfit)
+
     return {
         "message": "Outfit rated successfully",
         "outfit_id": outfit_id,
-        "rating": rating
+        "rating": outfit.rating
     }
 
 @router.get("/recommendations/smart")

@@ -31,6 +31,7 @@ const OutfitBuilder: React.FC = () => {
   const apiService = ApiService.getInstance();
   const [wardrobeItems, setWardrobeItems] = useState<ClothingItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [currentOutfit, setCurrentOutfit] = useState<{ [key: string]: ClothingItem }>({});
   const [outfitName, setOutfitName] = useState('');
@@ -54,9 +55,13 @@ const OutfitBuilder: React.FC = () => {
     fetchWardrobeItems();
   }, []);
 
-  const fetchWardrobeItems = async () => {
+  const fetchWardrobeItems = async (showRefreshIndicator = false) => {
     try {
-      setLoading(true);
+      if (showRefreshIndicator) {
+        setIsRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       const response = await apiService.getWardrobeItems() as { items?: any[] };
       const items = (response.items || []).map((item: any) => ({
         id: item.id,
@@ -71,7 +76,12 @@ const OutfitBuilder: React.FC = () => {
       console.error('Failed to fetch wardrobe items:', error);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    await fetchWardrobeItems(true);
   };
 
   const moveItemToOutfit = useCallback((item: ClothingItem, targetCategory: string) => {
@@ -130,7 +140,24 @@ const OutfitBuilder: React.FC = () => {
       <div className="flex flex-col lg:flex-row h-full gap-4 lg:gap-6">
         {/* Wardrobe Items Panel */}
         <div className="w-full lg:w-1/3 bg-gray-50 rounded-lg p-4">
-          <h3 className="text-lg font-semibold mb-4">Your Wardrobe</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Your Wardrobe</h3>
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing || loading}
+              className="text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              title="Refresh wardrobe items"
+            >
+              <svg
+                className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          </div>
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>

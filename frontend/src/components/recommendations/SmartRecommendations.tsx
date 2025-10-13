@@ -21,6 +21,7 @@ const SmartRecommendations: React.FC = () => {
   const { user } = useAuth();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadingLocation, setLoadingLocation] = useState(true);
   const [event, setEvent] = useState('');
   const [location, setLocation] = useState<LocationData | null>(null);
@@ -130,7 +131,7 @@ const SmartRecommendations: React.FC = () => {
     }
   };
 
-  const fetchRecommendations = async () => {
+  const fetchRecommendations = async (showRefreshIndicator = false) => {
     // Temporary fallback for debugging - use a test user ID if real one is missing
     const userId = user?.id || 'test-user-123';
 
@@ -138,7 +139,12 @@ const SmartRecommendations: React.FC = () => {
       console.error('User ID is not available, using fallback:', user);
     }
 
-    setLoading(true);
+    if (showRefreshIndicator) {
+      setIsRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
     try {
       const temperature = weather?.temperature ?? 20;
       const data = await apiService.getOutfitRecommendations(
@@ -152,7 +158,12 @@ const SmartRecommendations: React.FC = () => {
       setRecommendations([]);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    await fetchRecommendations(true);
   };
 
   // Detect location and weather on component mount
@@ -296,11 +307,26 @@ const SmartRecommendations: React.FC = () => {
             </select>
           </div>
 
-          <div className="flex items-end">
+          <div className="flex items-end space-x-2">
             <button
-              onClick={fetchRecommendations}
+              onClick={handleRefresh}
+              disabled={isRefreshing || loading || loadingLocation}
+              className="px-4 py-2 text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all border border-gray-300 rounded-md"
+              title="Refresh recommendations"
+            >
+              <svg
+                className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            <button
+              onClick={() => fetchRecommendations()}
               disabled={loading || loadingLocation}
-              className="w-full px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+              className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
             >
               {loading ? 'Generating...' : 'Get Recommendations'}
             </button>

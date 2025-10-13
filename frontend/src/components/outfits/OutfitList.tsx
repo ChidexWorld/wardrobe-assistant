@@ -17,6 +17,7 @@ const OutfitList: React.FC = () => {
   const apiService = ApiService.getInstance();
   const [outfits, setOutfits] = useState<Outfit[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedOutfit, setSelectedOutfit] = useState<Outfit | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [rating, setRating] = useState(0);
@@ -25,9 +26,13 @@ const OutfitList: React.FC = () => {
     fetchOutfits();
   }, []);
 
-  const fetchOutfits = async () => {
+  const fetchOutfits = async (showRefreshIndicator = false) => {
     try {
-      setLoading(true);
+      if (showRefreshIndicator) {
+        setIsRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       const response = await apiService.getOutfits(20, 0) as { outfits?: Outfit[] };
       setOutfits(response.outfits || []);
     } catch (error) {
@@ -35,7 +40,12 @@ const OutfitList: React.FC = () => {
       setOutfits([]);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    await fetchOutfits(true);
   };
 
   const handleMarkAsWorn = async (outfitId: string) => {
@@ -97,8 +107,25 @@ const OutfitList: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Saved Outfits</h2>
-        <div className="text-sm text-gray-600">
-          {outfits.length} outfit{outfits.length !== 1 ? 's' : ''} saved
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing || loading}
+            className="text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            title="Refresh outfits"
+          >
+            <svg
+              className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+          <div className="text-sm text-gray-600">
+            {outfits.length} outfit{outfits.length !== 1 ? 's' : ''} saved
+          </div>
         </div>
       </div>
 

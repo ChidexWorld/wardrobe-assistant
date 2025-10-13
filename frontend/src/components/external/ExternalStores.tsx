@@ -23,6 +23,7 @@ const ExternalStores: React.FC = () => {
   const apiService = ApiService.getInstance();
   const [searchResults, setSearchResults] = useState<ExternalItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState('');
   const [color, setColor] = useState('');
@@ -39,10 +40,15 @@ const ExternalStores: React.FC = () => {
     { value: 'accessories', label: 'Accessories' },
   ];
 
-  const performSearch = async () => {
+  const performSearch = async (showRefreshIndicator = false) => {
     if (!searchQuery.trim()) return;
 
-    setLoading(true);
+    if (showRefreshIndicator) {
+      setIsRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
     try {
       const data = await apiService.searchExternalStores(searchQuery, category, 20) as { results?: ExternalItem[] };
       setSearchResults(data.results || []);
@@ -51,6 +57,13 @@ const ExternalStores: React.FC = () => {
       setSearchResults([]);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    if (searchQuery.trim()) {
+      await performSearch(true);
     }
   };
 
@@ -199,9 +212,26 @@ const ExternalStores: React.FC = () => {
 
           {searchResults.length > 0 && (
             <div className="bg-white rounded-lg p-6 shadow-sm">
-              <h3 className="text-lg font-semibold mb-4">
-                Found {searchResults.length} items for "{searchQuery}"
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">
+                  Found {searchResults.length} items for "{searchQuery}"
+                </h3>
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing || loading}
+                  className="text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  title="Refresh search results"
+                >
+                  <svg
+                    className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {searchResults.map(item => (
